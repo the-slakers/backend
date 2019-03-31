@@ -43,6 +43,9 @@
  */
 package RestAPI;
 
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.stream.DoubleStream;
 import javax.ejb.Stateless;
 
 import javax.ws.rs.Path;
@@ -50,8 +53,12 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Produces;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.POST;
+import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.*;
+import org.json.JSONArray;
 //import org.json.JSONArray;
 import org.json.JSONObject;
 //import com.sun.xml.internal.ws.streaming.XMLStreamReaderException;
@@ -74,9 +81,177 @@ public class RESTServerResource {
     @GET
     @Produces("text/html")
     public String getGreeting() {
-        return "<html><body><h1>Hello !</h1></body></html>";
+        String s = "<html><body><h1>";
+        //return "<html><body><h1>Hello !</h1></body></html>";
+        // Udskift med din egen databasedriver og -URL
+        Connection connection = null;
+        Statement statement = null;
+
+        try {
+            connection = ConnectionConfiguration.getConnection();
+            statement = connection.createStatement();
+
+            statement.executeUpdate("USE test;");
+            ResultSet rs = statement.executeQuery("SELECT  * FROM MyGuests;");
+
+            while (rs.next()) {
+                String navn = rs.getString("firstname");
+                String lastname = rs.getString("lastname");
+                System.out.println(navn + " " + lastname);
+                s = s.concat(navn + " " + lastname + "\n");
+            }
+        } catch (Exception e) {
+            System.exit(1);
+        }
+        s = s.concat("...</h1></body></html>");
+        return s;
+
     }
 
+    @Path("json")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response doThis(@QueryParam("test") String x) {
+        JSONArray response = new JSONArray();
+        //  JSONObject response = new JSONObject();
+
+        Connection connection = null;
+        Statement statement = null;
+        JSONObject jo = new JSONObject();
+
+        try {
+            connection = ConnectionConfiguration.getConnection();
+            statement = connection.createStatement();
+
+            statement.executeUpdate("USE Test01;");
+            ResultSet rs = statement.executeQuery("SELECT * FROM TrendlogRecords WHERE VALUE<100 AND VALUE >1 AND Trendlogid=11;");
+            //statement.executeUpdate("USE test;");
+            //ResultSet rs = statement.executeQuery("SELECT  * FROM MyGuests;");
+
+            while (rs.next()) {
+                String id = rs.getString("Id");
+                String value = rs.getString("Value");
+                System.out.println("id: " + id + " , value: " + value);
+                jo.put("Id", id);
+                jo.put("Value", value);
+                response.put(jo);
+            }
+
+            jo.put("testAfTest", x);
+
+            //while (rs.next()) {
+            /*
+            System.out.println("Rhello my friend");
+            JSONObject jo = new JSONObject();
+            String navn = rs.getString(0);
+             */
+ /*
+            statement.executeUpdate("USE test;");
+            ResultSet rs = statement.executeQuery("SELECT  * FROM MyGuests;");
+
+            while (rs.next()) {
+                JSONObject jo = new JSONObject();
+                String navn = rs.getString("firstname");
+                String lastname = rs.getString("lastname");
+
+                jo.put("firstname", navn);
+                jo.put("lastname", lastname);
+                response.put(jo);
+
+            }
+             */
+        } catch (Exception e) {
+            System.exit(1);
+        }
+
+        return Response.ok(response.toString(), MediaType.APPLICATION_JSON).build();
+    }
+
+    @Path("Average")
+    @GET
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response average(@Context UriInfo info) {
+        //@QueryParam("ID") String buildingID
+        //Info
+        String buildingID = info.getQueryParameters().getFirst("ID");
+        String time = info.getQueryParameters().getFirst("TIME");
+        //T for today
+        //W for last 7 days
+        //M for month
+
+        //Answer
+        JSONObject response = new JSONObject();
+
+        //Hardcoded buildings
+        ArrayList<String> buildingList = new ArrayList<>();
+        buildingList.add("450");
+        buildingList.add("424");
+        buildingList.add("412");
+
+        String final_id = "0";
+
+        for (int i = 0; i < buildingList.size(); i++) {
+
+            switch (buildingID) {
+                case "450":
+                    final_id = "120";
+                    break;
+                case "424":
+                    final_id = "127";
+                    break;
+                case "412":
+                    final_id = "135";
+                    break;
+                default:
+                    return Response.status(Response.Status.BAD_REQUEST).build();
+            }
+
+        }
+
+        //  JSONObject response = new JSONObject();
+        Connection connection = null;
+        Statement statement = null;
+        JSONObject jo = new JSONObject();
+
+        try {
+            connection = ConnectionConfiguration.getConnection();
+            statement = connection.createStatement();
+
+            statement.executeUpdate("USE Test01;");
+            ResultSet rs = statement.executeQuery("SELECT * FROM TrendlogRecords WHERE VALUE<94 AND VALUE > 2 AND Trendlogid=" + final_id + ";");
+            //statement.executeUpdate("USE test;");
+            //ResultSet rs = statement.executeQuery("SELECT  * FROM MyGuests;");
+
+            ArrayList<Double> DataArray = new ArrayList<>();
+            while (rs.next()) {
+                //String id = rs.getString("Id");
+                String s_value = rs.getString("Value").replace(',', '.');
+                Double value = Double.valueOf(s_value);
+                DataArray.add(value);
+
+                //System.out.println("value: " + value);
+                //jo.put("Id", id);
+            }
+
+            double sum = 0;
+            for (int i = 0; i < DataArray.size(); i++) {
+                sum += DataArray.get(i);
+            }
+            double average = sum / DataArray.size();
+
+            //Put in final answer
+            jo.put("Value", average);
+            response.put("Value", jo);
+
+            return Response.ok(response.toString(), MediaType.APPLICATION_JSON).build();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Response.serverError().build();
+        }
+
+    }
+
+    /*
     @Path("closeAllGames")
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
@@ -253,7 +428,8 @@ public class RESTServerResource {
 
         return Response.ok(games.toString(), MediaType.APPLICATION_JSON).build();
     }
-         */
+         
         return Response.ok(response.toString(), MediaType.APPLICATION_JSON).build();
     }
+     */
 }
